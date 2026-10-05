@@ -1,11 +1,13 @@
 # main.py — botni ishga tushirish nuqtasi
 import asyncio
 import logging
+import os
 import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiohttp import web
 
 import db
 from config import CONFIG
@@ -19,6 +21,28 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger("bot")
+
+
+async def run_health_server() -> None:
+    """Render bepul Web Service uchun sog'liq tekshiruvi.
+
+    Render ochiq port talab qiladi, UptimeRobot esa shu manzilni
+    har 5 daqiqada chaqirib servisni "uxlab" qolishdan saqlaydi.
+    PORT ni Render avtomatik beradi, lokalda 10000.
+    """
+    async def health(_: web.Request) -> web.Response:
+        return web.Response(text="OK")
+
+    app = web.Application()
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", "10000"))
+    await web.TCPSite(runner, "0.0.0.0", port).start()
+    log.info("Health server %s-portda ishga tushdi.", port)
+    # Polling bilan birga yashashi uchun cheksiz kutamiz
+    await asyncio.Event().wait()
 
 
 async def main() -> None:
@@ -45,9 +69,11 @@ async def main() -> None:
     )
 
     log.info("Bot ishga tushdi. Adminlar: %s", sorted(CONFIG.admin_ids) or "yo'q")
+    health_task = asyncio.create_task(run_health_server())
     try:
         await dp.start_polling(bot)
     finally:
+        health_task.cancel()
         scheduler.shutdown(wait=False)
         await bot.session.close()
 

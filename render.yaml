@@ -1,12 +1,16 @@
-# render.yaml — Render Blueprint: Background Worker ni avtomatik sozlaydi
+# render.yaml — Render Blueprint: BEPUL Web Service ni avtomatik sozlaydi
 # Ishlatish: Render da + New -> Blueprint -> telegram-bot reponi tanlash.
 # BOT_TOKEN va ADMIN_IDS ni Render dashboard (Environment) ga qo'lda qo'shing.
+# Keyin https://uptimerobot.com da bepul monitor qo'shib, servis URL ni
+# har 5 daqiqada chaqirtiring (servis uxlab qolmasligi uchun).
 services:
-  - type: worker
+  - type: web
     name: telegram-bot
     runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
+    healthCheckPath: /health
     envVars:
       - key: BOT_TOKEN
         sync: false
