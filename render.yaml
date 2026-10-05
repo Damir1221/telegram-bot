@@ -1,0 +1,14 @@
+# render.yaml — Render Blueprint: Background Worker ni avtomatik sozlaydi
+# Ishlatish: Render da + New -> Blueprint -> telegram-bot reponi tanlash.
+# BOT_TOKEN va ADMIN_IDS ni Render dashboard (Environment) ga qo'lda qo'shing.
+services:
+  - type: worker
+    name: telegram-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        value: "7202086547"
