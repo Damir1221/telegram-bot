@@ -1,7 +1,7 @@
 # handlers/user.py — mijoz tomoni: /start, telefon tekshirish, info tugmalar
 import logging
 from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.exceptions import TelegramForbiddenError, TelegramAPIError
 
@@ -152,6 +152,19 @@ async def show_music(message: Message) -> None:
 async def show_services(message: Message) -> None:
     await send_content_message(
         message, db.KEY_SERVICES, "Hozircha xizmatlar qo'shilmagan."
+    )
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    """Yordam: bot qanday ishlaydi."""
+    await message.answer(
+        "❓ <b>Yordam</b>\n\n"
+        "1. «📱 Raqamni yuborish» tugmasi bilan raqamingizni yuboring.\n"
+        "2. Raqamingiz ro'yxatda bo'lsa — obuna bo'lasiz va har 30 kunda xabar olasz.\n"
+        "3. «🎵 Yangi musiqa va kliplar» va «🛠 Bizning xizmatlar» "
+        "tugmalaridan yangiliklarni ko'ring.\n\n"
+        "Raqamingiz topilmasa — administratorga murojaat qiling."
     )
 
 

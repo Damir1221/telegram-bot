@@ -58,6 +58,49 @@ async def send_due_messages(bot: Bot, days: int = 30) -> int:
     return sent
 
 
+async def send_broadcast(bot: Bot) -> dict:
+    """Joriy SMS ni BARCHA faol obunachilarga darhol yuboradi.
+
+    Qaytaradi: {"sent":..., "blocked":..., "failed":...}.
+    Yuborilganlarning last_sent yangilanadi (keyingi sana shundan +30 kun).
+    """
+    result = {"sent": 0, "blocked": 0, "failed": 0}
+    try:
+        sms_text = await db.get_setting(db.KEY_SMS)
+    except Exception as e:
+        log.exception("SMS matnni o'qishda xato: %s", e)
+        return result
+    if not sms_text.strip():
+        return result
+    try:
+        subs = await db.get_active_subscribers()
+    except Exception as e:
+        log.exception("Obunachilarni olishda xato: %s", e)
+        return result
+    for sub in subs:
+        chat_id = sub["chat_id"]
+        try:
+            await bot.send_message(chat_id, sms_text)
+            await db.update_last_sent(chat_id)
+            result["sent"] += 1
+        except TelegramForbiddenError:
+            log.info("Chat %s bloklagan, nofaol qilindi.", chat_id)
+            try:
+                await db.set_subscriber_active(chat_id, False)
+            except Exception:
+                pass
+            result["blocked"] += 1
+        except TelegramAPIError as e:
+            log.warning("Chat %s ga yuborilmadi: %s", chat_id, e)
+            result["failed"] += 1
+        except Exception as e:
+            log.exception("Chat %s ga yuborishda xato: %s", chat_id, e)
+            result["failed"] += 1
+        await asyncio.sleep(0.05)
+    log.info("Broadcast: %s", result)
+    return result
+
+
 def setup_scheduler(bot: Bot, hour: int = 10, minute: int = 0,
                     timezone: str = "Asia/Tashkent", days: int = 30) -> AsyncIOScheduler:
     """Har kuni belgilangan vaqtda tekshiruv ishga tushiradigan scheduler."""

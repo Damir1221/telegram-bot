@@ -242,3 +242,33 @@ async def phones_with_start(db_path: str = DB_PATH) -> set[str]:
         async with db.execute("SELECT DISTINCT phone FROM subscribers") as cur:
             rows = await cur.fetchall()
             return {r[0] for r in rows}
+
+
+async def get_active_subscribers(db_path: str = DB_PATH) -> list[dict]:
+    """Barcha faol obunachilar (darhol yuborish uchun)."""
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT chat_id, phone FROM subscribers WHERE active=1"
+        ) as cur:
+            return [{"chat_id": r[0], "phone": r[1]} async for r in cur]
+
+
+async def get_stats(days: int = 30, db_path: str = DB_PATH) -> dict:
+    """Admin statistikasi: raqamlar, obunachilar, muddati kelganlar."""
+    numbers = await list_numbers(db_path)
+    started = await phones_with_start(db_path)
+    total = active = 0
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute("SELECT COUNT(*), SUM(active) FROM subscribers") as cur:
+            row = await cur.fetchone()
+            total = row[0] or 0
+            active = row[1] or 0
+    due = await get_due_subscribers(days=days, db_path=db_path)
+    return {
+        "numbers_total": len(numbers),
+        "numbers_started": len(started & set(numbers)),
+        "subs_total": total,
+        "subs_active": active,
+        "subs_inactive": total - active,
+        "due_now": len(due),
+    }

@@ -40,6 +40,8 @@ def admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="➕ Yangi raqam kiritish", callback_data="adm:numbers")],
         [InlineKeyboardButton(text="🎵 Yangi musiqa va kliplar", callback_data="adm:music")],
         [InlineKeyboardButton(text="🛠 Bizning xizmatlar", callback_data="adm:services")],
+        [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
+        [InlineKeyboardButton(text="📢 Hammasiga hozir yuborish", callback_data="adm:bc")],
     ])
 
 
@@ -418,3 +420,87 @@ async def content_received(message: Message, state: FSMContext) -> None:
     await db.set_setting(key, db.dump_content(text.strip(), file_id, file_type))
     await state.clear()
     await message.answer(f"✅ <b>{title}</b> yangilandi.", reply_markup=back_kb())
+
+
+# ---------- 5) Statistika ----------
+
+async def stats_text() -> str:
+    s = await db.get_stats()
+    return (
+        "📊 <b>Statistika</b>\n\n"
+        f"📋 Raqamlar: {s['numbers_total']} ta "
+        f"(start bergan: {s['numbers_started']})\n"
+        f"👥 Obunachilar: {s['subs_total']} ta\n"
+        f"   ✅ faol: {s['subs_active']}\n"
+        f"   ⛔ nofaol (bloklagan): {s['subs_inactive']}\n"
+        f"⏰ Muddati kelgan (30 kun): {s['due_now']} ta"
+    )
+
+
+@router.callback_query(F.data == "adm:stats")
+async def cb_stats(call: CallbackQuery) -> None:
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    try:
+        await call.message.edit_text(await stats_text(), reply_markup=back_kb())
+    except Exception:
+        await call.message.answer(await stats_text(), reply_markup=back_kb())
+    await call.answer()
+
+
+@router.message(Command("stat"))
+async def cmd_stat(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        return
+    await message.answer(await stats_text())
+
+
+# ---------- 6) Hammasiga hozir yuborish (broadcast) ----------
+
+@router.callback_query(F.data == "adm:bc")
+async def cb_broadcast(call: CallbackQuery) -> None:
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    s = await db.get_stats()
+    if not s["subs_active"]:
+        await call.answer("Faol obunachi yo'q.", show_alert=True)
+        return
+    await call.message.answer(
+        f"📢 <b>{s['subs_active']} ta</b> faol obunachiga joriy SMS hozir yuborilsinmi?\n"
+        "Yuborilganlarning 30 kunlik hisobi shu sanadan qayta boshlanadi.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Yuborish", callback_data="adm:bc_yes")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm:bc_no")],
+        ]),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "adm:bc_yes")
+async def cb_broadcast_yes(call: CallbackQuery) -> None:
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    await call.message.edit_text("⏳ Yuborilmoqda...")
+    await call.answer()
+    from scheduler import send_broadcast
+    res = await send_broadcast(call.bot)
+    await call.message.answer(
+        "📢 <b>Yakunlandi:</b>\n"
+        f"✅ yuborildi: {res['sent']}\n"
+        f"⛔ bloklagan (nofaol qilindi): {res['blocked']}\n"
+        f"❌ xatolik: {res['failed']}",
+        reply_markup=back_kb(),
+    )
+
+
+@router.callback_query(F.data == "adm:bc_no")
+async def cb_broadcast_no(call: CallbackQuery, state: FSMContext) -> None:
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    await state.clear()
+    await call.message.answer("❌ Bekor qilindi.", reply_markup=back_kb())
+    await call.answer()

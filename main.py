@@ -69,6 +69,12 @@ async def main() -> None:
     )
 
     log.info("Bot ishga tushdi. Adminlar: %s", sorted(CONFIG.admin_ids) or "yo'q")
+    # Adminlarni ogohlantirish: bot ishga tushdi (qayta yonishlar ko'rinadi)
+    for admin_id in CONFIG.admin_ids:
+        try:
+            await bot.send_message(admin_id, "✅ Bot ishga tushdi.")
+        except Exception as e:
+            log.warning("Adminga xabar yuborilmadi (%s): %s", admin_id, e)
     health_task = asyncio.create_task(run_health_server())
     try:
         await dp.start_polling(bot)
